@@ -26,22 +26,22 @@
 </form>
 
 <script>
-  // Kullanıcı adı ve şifre sor
-  const username = prompt("İsminizi girin:");
-  const secretKey = prompt("Şifre (key) girin:");
 
-  // Pusher ayarları
-  const pusher = new Pusher('a9e16f9df028c5878b24', {
-    cluster: 'eu',
-    authEndpoint: "https://phpr.org/pusher.php",
-    auth: {
-      params: { username: username }
-    }
-  });
-
-  const channel = pusher.subscribe("private-channel");
-
-  const chat = document.getElementById('chat');
+// Kullanıcıdan isim ve şifre iste
+    const username = prompt("İsminizi girin:");
+    const secretKey = prompt("Gizli Anahtarı girin:"); // Kullanıcıdan KEY alıyoruz
+    
+    // Pusher ayarları
+    const pusher = new Pusher('a9e16f9df028c5878b24', {
+      cluster: 'eu',
+      authEndpoint: "https://phpr.org/pusher.php",
+      auth: {
+        params: { username: username }
+      }
+    });
+    
+    // Kanala bağlan
+    let channel = pusher.subscribe("private-channel");
 
   // Mesajı ekrana yazdıran fonksiyon
   function addMessage(sender, text) {
@@ -51,30 +51,50 @@
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
   }
-
-  // Başkalarından gelen mesaj
-  channel.bind('client-message', function(data) {
-    const decrypted = CryptoJS.AES.decrypt(data.message, secretKey).toString(CryptoJS.enc.Utf8);
-    addMessage(data.username, decrypted);
-  });
-
-  // Mesaj gönderme
-  const form = document.getElementById('form');
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    const input = document.getElementById('input');
-    const message = input.value.trim();
-    if (message) {
-      const encrypted = CryptoJS.AES.encrypt(message, secretKey).toString();
-      channel.trigger('client-message', {
-        username: username,
-        message: encrypted
-      });
-      // **Gönderen kendi mesajını da hemen görsün**
-      addMessage(username, message);
-      input.value = '';
-    }
-  });
+    
+    // Mesaj geldiğinde
+    channel.bind('client-message', function(data) {
+      const bytes = CryptoJS.AES.decrypt(data.message, secretKey);
+      let decrypted;
+      try {
+        decrypted = bytes.toString(CryptoJS.enc.Utf8);
+        if (!decrypted) { 
+          // Eğer boş dönerse hatalı çözüm olmuştur
+          decrypted = data.message;
+        }
+      } catch (e) {
+        decrypted = data.message;
+      }
+    
+      const chat = document.getElementById('chat');
+      const div = document.createElement('div');
+      div.className = 'message';
+      div.innerHTML = `<span class="${data.username === username ? 'me' : 'other'}">${data.username}</span>: ${decrypted}`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    });
+    
+    // Mesaj gönder
+    const form = document.getElementById('form');
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const input = document.getElementById('input');
+      console.log("Şifreli Mesaj:", input.value); // Şifreli mesajı konsola yazdır
+      const message = input.value.trim();
+      console.log("Şifreli Mesaj:", message); // Şifreli mesajı konsola yazdır
+      if (message) {
+        console.log("Şifreli Mesaj:", message); // Şifreli mesajı konsola yazdır
+        const encrypted = CryptoJS.AES.encrypt(message, secretKey).toString();
+        console.log("Şifreli Mesaj:", encrypted); // Şifreli mesajı konsola yazdır
+        channel.trigger("client-message", {
+          username: username,
+          message: encrypted
+        });
+        addMessage(username, message);
+        input.value = '';
+      }
+    });
+    
 </script>
 
 </body>
