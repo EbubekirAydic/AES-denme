@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Hızlı Chat</title>
+  <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
+  <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
+    #chat { flex: 1; padding: 10px; overflow-y: auto; background: #fff; }
+    #form { display: flex; padding: 10px; background: #eee; }
+    #input { flex: 1; padding: 10px; }
+    #send { padding: 10px 20px; }
+    .message { margin: 5px 0; }
+    .me { font-weight: bold; color: green; }
+    .other { font-weight: bold; color: blue; }
+  </style>
+</head>
+<body>
+
+<div id="chat"></div>
+
+<form id="form">
+  <input id="input" autocomplete="off" placeholder="Mesaj..." />
+  <button id="send" type="submit">Gönder</button>
+</form>
+
+<script>
+  // Kullanıcı adı ve şifre sor
+  const username = prompt("İsminizi girin:");
+  const secretKey = prompt("Şifre (key) girin:");
+
+  // Pusher ayarları
+  const pusher = new Pusher('a9e16f9df028c5878b24', {
+    cluster: 'eu',
+    authEndpoint: "https://phpr.org/pusher.php",
+    auth: {
+      params: { username: username }
+    }
+  });
+
+  const channel = pusher.subscribe("private-channel");
+
+  const chat = document.getElementById('chat');
+
+  // Mesajı ekrana yazdıran fonksiyon
+  function addMessage(sender, text) {
+    const div = document.createElement('div');
+    div.className = 'message';
+    div.innerHTML = `<span class="${sender === username ? 'me' : 'other'}">${sender}</span>: ${text}`;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  // Başkalarından gelen mesaj
+  channel.bind('client-message', function(data) {
+    const decrypted = CryptoJS.AES.decrypt(data.message, secretKey).toString(CryptoJS.enc.Utf8);
+    addMessage(data.username, decrypted);
+  });
+
+  // Mesaj gönderme
+  const form = document.getElementById('form');
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const input = document.getElementById('input');
+    const message = input.value.trim();
+    if (message) {
+      const encrypted = CryptoJS.AES.encrypt(message, secretKey).toString();
+      channel.trigger('client-message', {
+        username: username,
+        message: encrypted
+      });
+      // **Gönderen kendi mesajını da hemen görsün**
+      addMessage(username, message);
+      input.value = '';
+    }
+  });
+</script>
+
+</body>
+</html>
